@@ -1,0 +1,367 @@
+blueprint:
+  name: Hilo Challenge Control – AM/PM Temperature Strategy
+  description: >
+    Manage Hilo challenge phases dynamically with separate AM and PM temperature strategies,
+    skip toggles, preheat, comfort recovery, and scene restoration.
+
+    Phases:
+      1️⃣ Preheat → triggered by Preheat sensor (unless skipped)
+      2️⃣ Challenge → triggered by Peak in Progress (unless skipped)
+      3️⃣ Comfort Recovery → automatically calculated from normal temperature + offset
+      4️⃣ Restore Scene → restores user-defined scene after recovery
+
+  domain: automation
+
+  # ===========================
+  # 1️⃣ Participation & Skip Toggles 🌙☀️
+  # ===========================
+  input:
+    challenge_am:
+      name: Participate in AM Challenge ☀️
+      description: Enable participation in AM challenge
+      default: true
+      selector:
+        boolean:
+
+    challenge_pm:
+      name: Participate in PM Challenge 🌙
+      description: Enable participation in PM challenge
+      default: true
+      selector:
+        boolean:
+
+    skip_am:
+      name: Skip Next AM Challenge ☀️
+      description: Skip all preheat, challenge, and recovery for the next AM event
+      default: false
+      selector:
+        boolean:
+
+    skip_pm:
+      name: Skip Next PM Challenge 🌙
+      description: Skip all preheat, challenge, and recovery for the next PM event
+      default: false
+      selector:
+        boolean:
+
+    do_pre_heat:
+      name: Enable Preheat 🔥
+      description: Turn on preheating before the challenge
+      default: true
+      selector:
+        boolean:
+
+  # ===========================
+  # 2️⃣ Hilo Event Sensors 📡
+  # ===========================
+    preheat_entity:
+      name: Preheat Sensor
+      description: Binary sensor that is ON during preheating
+      selector:
+        entity:
+          domain: binary_sensor
+
+    peak_entity:
+      name: Peak in Progress Sensor
+      description: Binary sensor ON during Hilo challenge/reduction
+      selector:
+        entity:
+          domain: binary_sensor
+
+    peak_today_am_entity:
+      name: Peak Today AM ☀️
+      description: Binary sensor indicating if there is an AM peak today
+      selector:
+        entity:
+          domain: binary_sensor
+
+    peak_today_pm_entity:
+      name: Peak Today PM 🌙
+      description: Binary sensor indicating if there is a PM peak today
+      selector:
+        entity:
+          domain: binary_sensor
+
+  # ===========================
+  # 3️⃣ Devices to Control ⚡
+  # ===========================
+    thermostats:
+      name: Thermostats 🌡️
+      description: Thermostats to adjust during Hilo phases
+      selector:
+        entity:
+          domain: climate
+          multiple: true
+
+    water_heater:
+      name: Water Heater 💧 (Optional)
+      description: Switch to turn off during challenge/reduction phases
+      default: []
+      selector:
+        entity:
+          domain: switch
+          multiple: true
+
+    other_switches:
+      name: Other Switches 🔌 (Optional)
+      description: Additional switches to turn off during challenge/reduction
+      default: []
+      selector:
+        entity:
+          domain: switch
+          multiple: true
+
+  # ===========================
+  # 4️⃣ Temperature Strategy 🌡️
+  # ===========================
+    normal_temp:
+      name: Normal Temperature
+      description: Base temperature when no challenge is active
+      default: 21
+      selector:
+        number:
+          min: 15
+          max: 25
+          step: 0.5
+          unit_of_measurement: "°C"
+
+    preheat_temp_am:
+      name: AM Preheat Temperature ☀️
+      description: Temperature to use during AM preheat
+      default: 23
+      selector:
+        number:
+          min: 15
+          max: 25
+          step: 0.5
+          unit_of_measurement: "°C"
+
+    preheat_temp_pm:
+      name: PM Preheat Temperature 🌙
+      description: Temperature to use during PM preheat
+      default: 23
+      selector:
+        number:
+          min: 15
+          max: 25
+          step: 0.5
+          unit_of_measurement: "°C"
+
+    challenge_temp_am:
+      name: AM Challenge Temperature ☀️
+      description: Temperature during AM peak/reduction
+      default: 17
+      selector:
+        number:
+          min: 15
+          max: 25
+          step: 0.5
+          unit_of_measurement: "°C"
+
+    challenge_temp_pm:
+      name: PM Challenge Temperature 🌙
+      description: Temperature during PM peak/reduction
+      default: 17
+      selector:
+        number:
+          min: 15
+          max: 25
+          step: 0.5
+          unit_of_measurement: "°C"
+
+    appreciation_offset_am:
+      name: AM Comfort Recovery Offset ☀️
+      description: Added to normal temperature after AM peak
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 5
+          step: 0.5
+          unit_of_measurement: "°C"
+
+    appreciation_offset_pm:
+      name: PM Comfort Recovery Offset 🌙
+      description: Added to normal temperature after PM peak
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 5
+          step: 0.5
+          unit_of_measurement: "°C"
+
+    comfort_recovery_duration:
+      name: Comfort Recovery Duration ⏱️
+      description: How long to hold comfort recovery temperature before restoring scene
+      default: "00:30:00"
+      selector:
+        duration:
+
+  # ===========================
+  # 5️⃣ Post-Challenge Scene 🎬
+  # ===========================
+    restore_scene:
+      name: Scene to Restore
+      description: Scene to activate after all Hilo phases and comfort recovery
+      selector:
+        entity:
+          domain: scene
+
+# ===========================
+# TRIGGERS
+# ===========================
+triggers:
+  - platform: state
+    entity_id: !input preheat_entity
+  - platform: state
+    entity_id: !input peak_entity
+
+# ===========================
+# VARIABLES
+# ===========================
+variables:
+  thermostats: !input thermostats
+  water_heater: !input water_heater
+  other_switches: !input other_switches
+  preheat_entity: !input preheat_entity
+  peak_entity: !input peak_entity
+  peak_today_am_entity: !input peak_today_am_entity
+  peak_today_pm_entity: !input peak_today_pm_entity
+  restore_scene: !input restore_scene
+
+  challenge_am: !input challenge_am
+  challenge_pm: !input challenge_pm
+  skip_am: !input skip_am
+  skip_pm: !input skip_pm
+  do_pre_heat: !input do_pre_heat
+
+  normal_temp: !input normal_temp
+  preheat_temp_am: !input preheat_temp_am
+  preheat_temp_pm: !input preheat_temp_pm
+  challenge_temp_am: !input challenge_temp_am
+  challenge_temp_pm: !input challenge_temp_pm
+  appreciation_offset_am: !input appreciation_offset_am
+  appreciation_offset_pm: !input appreciation_offset_pm
+  comfort_recovery_duration: !input comfort_recovery_duration
+
+  # Determine phase & effective temps
+  peak_today_am_state: "{{ is_state(peak_today_am_entity, 'on') }}"
+  peak_today_pm_state: "{{ is_state(peak_today_pm_entity, 'on') }}"
+
+  effective_preheat_temp: >
+    {% if peak_today_am_state and not skip_am %}
+      {{ preheat_temp_am }}
+    {% elif peak_today_pm_state and not skip_pm %}
+      {{ preheat_temp_pm }}
+    {% else %}
+      {{ normal_temp }}
+    {% endif %}
+
+  effective_challenge_temp: >
+    {% if peak_today_am_state and not skip_am %}
+      {{ challenge_temp_am }}
+    {% elif peak_today_pm_state and not skip_pm %}
+      {{ challenge_temp_pm }}
+    {% else %}
+      {{ normal_temp }}
+    {% endif %}
+
+  effective_recovery_temp: >
+    {% if peak_today_am_state and not skip_am %}
+      {{ normal_temp + appreciation_offset_am }}
+    {% elif peak_today_pm_state and not skip_pm %}
+      {{ normal_temp + appreciation_offset_pm }}
+    {% else %}
+      {{ normal_temp }}
+    {% endif %}
+
+# ===========================
+# ACTIONS
+# ===========================
+action:
+  - choose:
+      # 1️⃣ Challenge Phase
+      - conditions:
+          - condition: state
+            entity_id: !input peak_entity
+            state: "on"
+        sequence:
+          - service: climate.set_temperature
+            target:
+              entity_id: !input thermostats
+            data:
+              temperature: "{{ effective_challenge_temp }}"
+          - choose:
+              - conditions: "{{ water_heater | length > 0 }}"
+                sequence:
+                  - service: switch.turn_off
+                    target:
+                      entity_id: !input water_heater
+          - choose:
+              - conditions: "{{ other_switches | length > 0 }}"
+                sequence:
+                  - service: switch.turn_off
+                    target:
+                      entity_id: !input other_switches
+
+      # 2️⃣ Preheat Phase
+      - conditions:
+          - condition: state
+            entity_id: !input preheat_entity
+            state: "on"
+          - condition: template
+            value_template: >
+              {% if peak_today_am_state %}{{ not skip_am }}{% elif peak_today_pm_state %}{{ not skip_pm }}{% else %}false{% endif %}
+        sequence:
+          - service: climate.set_temperature
+            target:
+              entity_id: !input thermostats
+            data:
+              temperature: "{{ effective_preheat_temp }}"
+          - choose:
+              - conditions: "{{ water_heater | length > 0 }}"
+                sequence:
+                  - service: switch.turn_on
+                    target:
+                      entity_id: !input water_heater
+          - choose:
+              - conditions: "{{ other_switches | length > 0 }}"
+                sequence:
+                  - service: switch.turn_on
+                    target:
+                      entity_id: !input other_switches
+
+    default:
+      # 3️⃣ Comfort Recovery / Restore Scene
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: !input peak_entity
+                state: "off"
+            sequence:
+              - service: climate.set_temperature
+                target:
+                  entity_id: !input thermostats
+                data:
+                  temperature: "{{ effective_recovery_temp }}"
+              - choose:
+                  - conditions: "{{ water_heater | length > 0 }}"
+                    sequence:
+                      - service: switch.turn_on
+                        target:
+                          entity_id: !input water_heater
+              - choose:
+                  - conditions: "{{ other_switches | length > 0 }}"
+                    sequence:
+                      - service: switch.turn_on
+                        target:
+                          entity_id: !input other_switches
+              - delay: !input comfort_recovery_duration
+              - service: scene.turn_on
+                target:
+                  entity_id: !input restore_scene
+              - service: homeassistant.turn_off
+                data:
+                  entity_id:
+                    - "{{ skip_am if peak_today_am_state else skip_pm }}"
