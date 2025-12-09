@@ -302,9 +302,9 @@ variables:
   appreciation_temp: "{{ normal_temp + appreciation_offset }}"
   # Determine whether current time is inside AM/PM windows and pick temperature
   is_am: >
-    {{ challenge_am and (now().time() >= strptime(am_start, '%H:%M').time() and now().time() <= strptime(am_end, '%H:%M').time()) }}
+    {{ challenge_am and (now().time() >= (as_datetime(am_start).time()) and now().time() <= (as_datetime(am_end).time())) }}
   is_pm: >
-    {{ challenge_pm and (now().time() >= strptime(pm_start, '%H:%M').time() and now().time() <= strptime(pm_end, '%H:%M').time()) }}
+    {{ challenge_pm and (now().time() >= (as_datetime(pm_start).time()) and now().time() <= (as_datetime(pm_end).time())) }}
   effective_challenge_temp: >
     {{ (challenge_temp_am if is_am else (challenge_temp_pm if is_pm else challenge_temp)) }}
   # Optional helper flags derived from mapped sensors (safe, for context/use in templates)
