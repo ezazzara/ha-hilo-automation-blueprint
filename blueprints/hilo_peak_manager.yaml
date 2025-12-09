@@ -38,7 +38,6 @@ blueprint:
       selector:
         boolean:
 
-    # AM/PM windows (configurable)
     am_start:
       name: AM Window Start
       description: Start time for AM challenge window (HH:MM)
@@ -84,62 +83,54 @@ blueprint:
         entity:
           domain: binary_sensor
 
-    # Optional sensors to improve setup/usability
     peak_today_am_entity:
       name: Peak Today AM
-      description: Optional sensor indicating an AM peak today (used for UI/context)
+      description: Optional sensor indicating AM peak today
       selector:
         entity:
           domain: binary_sensor
-      advanced: true
 
     peak_today_pm_entity:
       name: Peak Today PM
-      description: Optional sensor indicating a PM peak today (used for UI/context)
+      description: Optional sensor indicating PM peak today
       selector:
         entity:
           domain: binary_sensor
-      advanced: true
 
     next_event_begin_entity:
       name: Next Event Begin
-      description: Optional sensor reporting the next event start time (for context)
+      description: Optional sensor reporting next event start time
       selector:
         entity:
           domain: sensor
-      advanced: true
 
     next_event_end_entity:
       name: Next Event End
-      description: Optional sensor reporting the next event end time (for context)
+      description: Optional sensor reporting next event end time
       selector:
         entity:
           domain: sensor
-      advanced: true
 
     anchor_period_begin_entity:
       name: Anchor Period Begin
-      description: Optional sensor reporting the anchor period start time (timestamp or unknown)
+      description: Optional sensor reporting anchor period start
       selector:
         entity:
           domain: sensor
-      advanced: true
 
     anchor_period_end_entity:
       name: Anchor Period End
-      description: Optional sensor reporting the anchor period end time (timestamp or unknown)
+      description: Optional sensor reporting anchor period end
       selector:
         entity:
           domain: sensor
-      advanced: true
 
     preheat_start_time_entity:
       name: Preheat Start Time
-      description: Optional sensor reporting the timestamp when preheat will start (or 'unknown')
+      description: Optional sensor for next preheat start time
       selector:
         entity:
           domain: sensor
-      advanced: true
 
   # ===========================
   # 3️⃣ Devices to Control During Challenge
@@ -197,7 +188,7 @@ blueprint:
 
     challenge_temp:
       name: Challenge Temperature
-      description: Temperature to use during the Hilo peak/reduction phase
+      description: Temperature to use during Hilo peak/reduction
       default: 17
       selector:
         number:
@@ -208,7 +199,7 @@ blueprint:
 
     challenge_temp_am:
       name: AM Challenge Temperature
-      description: Temperature to use during AM challenge window
+      description: Temperature for AM challenge window
       default: 17
       selector:
         number:
@@ -219,7 +210,7 @@ blueprint:
 
     challenge_temp_pm:
       name: PM Challenge Temperature
-      description: Temperature to use during PM challenge window
+      description: Temperature for PM challenge window
       default: 17
       selector:
         number:
@@ -231,9 +222,8 @@ blueprint:
     appreciation_offset:
       name: Comfort Recovery Offset
       description: >
-        Added to the normal temperature to create the comfort recovery temperature
-        immediately after a peak event.  
-        Actual recovery temp = normal_temp + appreciation_offset
+        Added to normal temperature to create recovery temp after peak.  
+        Recovery temp = normal_temp + appreciation_offset
       default: 2
       selector:
         number:
@@ -244,7 +234,7 @@ blueprint:
 
     comfort_recovery_duration:
       name: Comfort Recovery Duration
-      description: Duration to hold the comfort recovery temperature before restoring the scene
+      description: Duration to hold comfort recovery temp
       default: "00:30:00"
       selector:
         duration:
@@ -254,7 +244,7 @@ blueprint:
   # ===========================
     restore_scene:
       name: Scene to Restore
-      description: Scene to restore after all Hilo phases and comfort recovery complete
+      description: Scene to restore after recovery
       selector:
         entity:
           domain: scene
@@ -300,88 +290,15 @@ variables:
   appreciation_offset: !input appreciation_offset
   comfort_recovery_duration: !input comfort_recovery_duration
   appreciation_temp: "{{ normal_temp + appreciation_offset }}"
-  # Determine whether current time is inside AM/PM windows and pick temperature
+
   is_am: >
     {{ challenge_am and (now().time() >= (as_datetime(am_start).time()) and now().time() <= (as_datetime(am_end).time())) }}
+
   is_pm: >
     {{ challenge_pm and (now().time() >= (as_datetime(pm_start).time()) and now().time() <= (as_datetime(pm_end).time())) }}
+
   effective_challenge_temp: >
     {{ (challenge_temp_am if is_am else (challenge_temp_pm if is_pm else challenge_temp)) }}
-  # Optional helper flags derived from mapped sensors (safe, for context/use in templates)
-  peak_today_am_state: >
-    {{ peak_today_am_entity and is_state(peak_today_am_entity, 'on') }}
-  peak_today_pm_state: >
-    {{ peak_today_pm_entity and is_state(peak_today_pm_entity, 'on') }}
-  next_event_begin_state: >
-    {{ (states(next_event_begin_entity) if next_event_begin_entity else '') }}
-  next_event_end_state: >
-    {{ (states(next_event_end_entity) if next_event_end_entity else '') }}
-  # Time-sensor parsing helpers (use as_timestamp to validate timestamps)
-  # Pattern: set raw state, try to convert to ts; if conversion fails or is falsy, return 0/''
-  next_event_begin_ts: >
-    {% set _s = states(next_event_begin_entity) if next_event_begin_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ _ts if _ts else 0 }}
-  next_event_begin_known: >
-    {% set _s = states(next_event_begin_entity) if next_event_begin_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ (_ts is not none) and (_ts | int > 0) }}
-  next_event_begin_time: >
-    {% set _s = states(next_event_begin_entity) if next_event_begin_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ ( _ts | timestamp_custom('%H:%M', false) ) if (_ts is not none and _ts | int > 0) else '' }}
-
-  next_event_end_ts: >
-    {% set _s = states(next_event_end_entity) if next_event_end_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ _ts if _ts else 0 }}
-  next_event_end_known: >
-    {% set _s = states(next_event_end_entity) if next_event_end_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ (_ts is not none) and (_ts | int > 0) }}
-  next_event_end_time: >
-    {% set _s = states(next_event_end_entity) if next_event_end_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ ( _ts | timestamp_custom('%H:%M', false) ) if (_ts is not none and _ts | int > 0) else '' }}
-
-  anchor_period_begin_ts: >
-    {% set _s = states(anchor_period_begin_entity) if anchor_period_begin_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ _ts if _ts else 0 }}
-  anchor_period_begin_known: >
-    {% set _s = states(anchor_period_begin_entity) if anchor_period_begin_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ (_ts is not none) and (_ts | int > 0) }}
-  anchor_period_begin_time: >
-    {% set _s = states(anchor_period_begin_entity) if anchor_period_begin_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ ( _ts | timestamp_custom('%H:%M', false) ) if (_ts is not none and _ts | int > 0) else '' }}
-
-  anchor_period_end_ts: >
-    {% set _s = states(anchor_period_end_entity) if anchor_period_end_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ _ts if _ts else 0 }}
-  anchor_period_end_known: >
-    {% set _s = states(anchor_period_end_entity) if anchor_period_end_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ (_ts is not none) and (_ts | int > 0) }}
-  anchor_period_end_time: >
-    {% set _s = states(anchor_period_end_entity) if anchor_period_end_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ ( _ts | timestamp_custom('%H:%M', false) ) if (_ts is not none and _ts | int > 0) else '' }}
-
-  preheat_start_ts: >
-    {% set _s = states(preheat_start_time_entity) if preheat_start_time_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ _ts if _ts else 0 }}
-  preheat_start_known: >
-    {% set _s = states(preheat_start_time_entity) if preheat_start_time_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ (_ts is not none) and (_ts | int > 0) }}
-  preheat_start_time: >
-    {% set _s = states(preheat_start_time_entity) if preheat_start_time_entity else '' %}
-    {% set _ts = _s | as_timestamp %}
-    {{ ( _ts | timestamp_custom('%H:%M', false) ) if (_ts is not none and _ts | int > 0) else '' }}
 
 # ===========================
 # ACTIONS
@@ -398,22 +315,21 @@ action:
             data:
               level: info
               logger: hilo_peak_manager
-              message: >
-                [HILO Peak] Challenge triggered. Next Event: {{ next_event_begin_time }}-{{ next_event_end_time }} | 
-                Anchor: {{ anchor_period_begin_time }}-{{ anchor_period_end_time }} | 
-                Peak Today: AM={{ peak_today_am_state }} PM={{ peak_today_pm_state }} | 
-                Effective Temp: {{ effective_challenge_temp }}°C
+              message: "[HILO Peak] Challenge triggered."
+
           - service: climate.set_temperature
             target:
               entity_id: !input thermostats
             data:
               temperature: "{{ effective_challenge_temp }}"
+
           - choose:
               - conditions: "{{ water_heater | length > 0 }}"
                 sequence:
                   - service: switch.turn_off
                     target:
                       entity_id: !input water_heater
+
           - choose:
               - conditions: "{{ other_switches | length > 0 }}"
                 sequence:
@@ -431,22 +347,21 @@ action:
             data:
               level: info
               logger: hilo_peak_manager
-              message: >
-                [HILO Preheat] Preheat triggered. Preheat Start Time: {{ preheat_start_time }} | 
-                Next Event: {{ next_event_begin_time }}-{{ next_event_end_time }} | 
-                Peak Today: AM={{ peak_today_am_state }} PM={{ peak_today_pm_state }} | 
-                Preheat Temp: {{ preheat_temp }}°C
+              message: "[HILO Preheat] Preheat triggered."
+
           - service: climate.set_temperature
             target:
               entity_id: !input thermostats
             data:
               temperature: !input preheat_temp
+
           - choose:
               - conditions: "{{ water_heater | length > 0 }}"
                 sequence:
                   - service: switch.turn_on
                     target:
                       entity_id: !input water_heater
+
           - choose:
               - conditions: "{{ other_switches | length > 0 }}"
                 sequence:
@@ -455,7 +370,7 @@ action:
                       entity_id: !input other_switches
 
     default:
-      # 3️⃣ Comfort Recovery / Restore Scene
+      # 3️⃣ Comfort Recovery
       - choose:
           - conditions:
               - condition: state
@@ -466,27 +381,30 @@ action:
                 data:
                   level: info
                   logger: hilo_peak_manager
-                  message: >
-                    [HILO Recovery] Peak ended, entering comfort recovery. Recovery Temp: {{ appreciation_temp }}°C ({{ comfort_recovery_duration }}) | 
-                    Next Event: {{ next_event_begin_time }}-{{ next_event_end_time }}
+                  message: "[HILO Recovery] Peak ended."
+
               - service: climate.set_temperature
                 target:
                   entity_id: !input thermostats
                 data:
                   temperature: "{{ appreciation_temp }}"
+
               - choose:
                   - conditions: "{{ water_heater | length > 0 }}"
                     sequence:
                       - service: switch.turn_on
                         target:
                           entity_id: !input water_heater
+
               - choose:
                   - conditions: "{{ other_switches | length > 0 }}"
                     sequence:
                       - service: switch.turn_on
                         target:
                           entity_id: !input other_switches
+
               - delay: !input comfort_recovery_duration
+
               - service: scene.turn_on
                 target:
                   entity_id: !input restore_scene
