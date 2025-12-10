@@ -4,8 +4,7 @@ blueprint:
     Controls heating for Hilo challenges (preheat, reduction, comfort recovery)
     with separate AM/PM temps, skip toggles, optional switches, and a restore scene.
   domain: automation
-  min_version: "2024.6.0"
-
+  
   input:
     # ――― General Settings ―――
     general_settings:
