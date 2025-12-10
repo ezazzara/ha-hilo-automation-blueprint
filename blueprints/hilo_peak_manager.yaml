@@ -7,7 +7,6 @@ blueprint:
     • Comfort recovery + scene restore  
     • Optional water heater / switches control  
   domain: automation
-  min_version: "2024.6.0"
 
   input:
 
