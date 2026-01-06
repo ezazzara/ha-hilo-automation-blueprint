@@ -208,8 +208,8 @@ blueprint:
           default: []
           selector:
             target:
-              entity:
-                domain: device_tracker
+              device:
+                integration: mobile_app
 
         peak_tomorrow_am_entity:
           name: Peak Tomorrow AM Sensor
@@ -241,9 +241,11 @@ triggers:
   - platform: state
     entity_id: !input peak_tomorrow_am_entity
     to: "on"
+    id: peak_am
   - platform: state
     entity_id: !input peak_tomorrow_pm_entity
     to: "on"
+    id: peak_pm
 
 # ===========================
 # VARIABLES
@@ -336,15 +338,14 @@ action:
       - conditions:
           - condition: template
             value_template: >
-              {% set tid = trigger.entity_id | string %}
-              {{ tid in [peak_tomorrow_am_entity | string, peak_tomorrow_pm_entity | string] }}
+              {{ trigger.id in ['peak_am', 'peak_pm'] }}
         sequence:
-          - service: notify.mobile_app
+          - service: notify.notify
             target: !input notify_device
             data:
               title: "Hilo Event Tomorrow"
               message: >
-                {% if trigger.entity_id == peak_tomorrow_am_entity %}
+                {% if trigger.id == 'peak_am' %}
                   An AM Hilo challenge is scheduled for tomorrow.
                 {% else %}
                   A PM Hilo challenge is scheduled for tomorrow.
@@ -367,7 +368,7 @@ action:
           - service: homeassistant.turn_on
             data:
               entity_id: >
-                {% if trigger.entity_id == peak_tomorrow_am_entity %}
+                {% if trigger.id == 'peak_am' %}
                   {{ skip_am_entity }}
                 {% else %}
                   {{ skip_pm_entity }}
@@ -398,7 +399,7 @@ action:
                       {% set device_defined = notify_device is defined and notify_device | length > 0 %}
                       {{ device_defined }}
                 sequence:
-                  - service: notify.mobile_app
+                  - service: notify.notify
                     data:
                       target: !input notify_device
                       message: "Hilo Preheat has started."
@@ -428,7 +429,7 @@ action:
                       {% set device_defined = notify_device is defined and notify_device | length > 0 %}
                       {{ device_defined }}
                 sequence:
-                  - service: notify.mobile_app
+                  - service: notify.notify
                     data:
                       target: !input notify_device
                       message: "Hilo Challenge has started."
@@ -458,7 +459,7 @@ action:
                       {% set device_defined = notify_device is defined and notify_device | length > 0 %}
                       {{ device_defined and effective_recovery_temp is not none }}
                 sequence:
-                  - service: notify.mobile_app
+                  - service: notify.notify
                     data:
                       target: !input notify_device
                       message: "Hilo Recovery has started."
