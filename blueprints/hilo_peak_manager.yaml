@@ -191,6 +191,39 @@ blueprint:
             entity:
               domain: scene
 
+    # ===========================
+    # 6️⃣ Notifications 📣
+    # ===========================
+    skip_notifications:
+      name: Notifications 📣
+      description: Notify when Hilo events occur
+      input:
+        notify_device:
+          name: Notification Device
+          description: Device(s) to send actionable notification to
+          default: []
+          selector:
+            target:
+              entity:
+                domain: device_tracker
+
+        peak_tomorrow_am_entity:
+          name: Peak Tomorrow AM Sensor
+          description: Binary sensor indicating if AM Hilo challenge is scheduled tomorrow
+          default: ""
+          selector:
+            entity:
+              domain: binary_sensor
+
+        peak_tomorrow_pm_entity:
+          name: Peak Tomorrow PM Sensor
+          description: Binary sensor indicating if PM Hilo challenge is scheduled tomorrow
+          default: ""
+          selector:
+            entity:
+              domain: binary_sensor
+        
+
 # ===========================
 # TRIGGERS
 # ===========================
@@ -201,6 +234,14 @@ triggers:
   - platform: state
     entity_id:
       - !input peak_entity
+  - platform: state
+    entity_id: !input peak_tomorrow_am_entity
+    from: "off"
+    to: "on"
+  - platform: state
+    entity_id: !input peak_tomorrow_pm_entity
+    from: "off"
+    to: "on"
 
 # ===========================
 # VARIABLES
@@ -345,3 +386,82 @@ action:
               entity_id:
                 - "{{ skip_am if is_am else skip_pm }}"
 
+  # 📣(Optional) Notify for Tomorrow's Hilo Event
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.entity_id == peak_tomorrow_am_entity
+                or trigger.entity_id == peak_tomorrow_pm_entity }}
+        sequence:
+          - service: notify.mobile_app
+            target: !input notify_device
+            data:
+              title: "Hilo Event Tomorrow"
+              message: >
+                {% if trigger.entity_id == peak_tomorrow_am_entity %}
+                  An AM Hilo challenge is scheduled for tomorrow.
+                {% else %}
+                  A PM Hilo challenge is scheduled for tomorrow.
+                {% endif %}
+              data:
+                actions:
+                  - action: "SKIP_EVENT"
+                    title: "Skip this event"
+
+          # Wait for user interaction (or timeout → do nothing)
+          - wait_for_trigger:
+              - platform: event
+                event_type: mobile_app_notification_action
+                event_data:
+                  action: "SKIP_EVENT"
+            timeout: "12:00:00"
+            continue_on_timeout: false
+
+          # Apply skip toggle only if user tapped Skip
+          - service: homeassistant.turn_on
+            data:
+              entity_id: >
+                {% if trigger.entity_id == peak_tomorrow_am_entity %}
+                  {{ skip_am }}
+                {% else %}
+                  {{ skip_pm }}
+                {% endif %}
+
+  # 📣(Optional) Notify of Hilo Event progress
+  - choose:
+      # 1️⃣ Preheat Notification
+      - conditions:
+          - condition: template
+            value_template: >
+              {% set device_defined = notify_device is defined and notify_device | length > 0 %}
+              {{ device_defined and trigger.entity_id == preheat_entity and trigger.to_state.state == 'on' }}
+        sequence:
+          - service: notify.mobile_app
+            data:
+              target: !input notify_device
+              message: "Hilo Preheat has started."
+
+      # 2️⃣ Challenge Notification
+      - conditions:
+          - condition: template
+            value_template: >
+              {% set device_defined = notify_device is defined and notify_device | length > 0 %}
+              {{ device_defined and trigger.entity_id == peak_entity and trigger.to_state.state == 'on' }}
+        sequence:
+          - service: notify.mobile_app
+            data:
+              target: !input notify_device
+              message: "Hilo Challenge has started."
+
+      # 3️⃣ Recovery Notification
+      - conditions:
+          - condition: template
+            value_template: >
+              {% set device_defined = notify_device is defined and notify_device | length > 0 %}
+              {{ device_defined and effective_recovery_temp is not none }}
+        sequence:
+          - service: notify.mobile_app
+            data:
+              target: !input notify_device
+              message: "Hilo Recovery has started."
