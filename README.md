@@ -19,7 +19,8 @@ Manage AM/PM preheat, challenge (reduction), and comfort recovery phases for one
 
 ## How it works (brief) 🔍
 
-- **Triggers:** the `preheat` and `peak` binary sensors; optional "peak tomorrow" sensors for notifications.
+- **Triggers:** the `preheat` and `peak` binary sensors.
+- **Notifications:** Optional "peak tomorrow" sensors can trigger an actionable mobile notification ("Skip this event") to set the corresponding skip toggle for the next AM/PM event. The blueprint detects these using trigger IDs (`peak_am` / `peak_pm`) to apply the correct skip behavior.
 - **AM/PM & logic:** The automation determines AM vs PM from `now().hour`, applies skip toggles, and selects the configured temperatures.
 - **Sequence:**
   1. Preheat — set preheat temperature when `preheat` sensor is ON (if preheat enabled)
@@ -47,7 +48,7 @@ Manage AM/PM preheat, challenge (reduction), and comfort recovery phases for one
 - `water_heater` (optional switch)
 - Temperatures: `normal_temp`, `preheat_temp_am`, `preheat_temp_pm`, `challenge_temp_am`, `challenge_temp_pm`
 - Recovery: `appreciation_offset_am`, `appreciation_offset_pm`, `comfort_recovery_duration`
-- `restore_scene` (optional), `notify_device`, `peak_tomorrow_am_entity`, `peak_tomorrow_pm_entity` (optional)
+- `restore_scene` (optional), `notify_targets` (mobile_app device targets, optional), `peak_tomorrow_am_entity`, `peak_tomorrow_pm_entity` (optional)
 
 ---
 
@@ -61,7 +62,7 @@ Manage AM/PM preheat, challenge (reduction), and comfort recovery phases for one
 
 ## Creating skip toggles (required)
 
-This blueprint requires two `input_boolean` Toggle helpers to be present and selected as `skip_am_entity` and `skip_pm_entity.
+This blueprint requires two `input_boolean` toggle helpers to be present and selected as `skip_am_entity` and `skip_pm_entity`.
 
 - UI: Home Assistant → Settings → Devices & Services → Helpers → Add Helper → Toggle. Create e.g. `hilo_skip_am` and `hilo_skip_pm`.
 
@@ -78,6 +79,13 @@ input_boolean:
 ```
 
 After creating the helpers, select them in the blueprint inputs under "Participation & Skip Toggles".
+
+**Note about notifications:** Set the `notify_targets` input to one or more `mobile_app` device targets to enable notifications. When configured, the blueprint will:
+
+- Send per-phase progress notifications (Preheat, Challenge, Recovery) inline with each action when `notify_targets` is defined.
+- Send an actionable "Skip this event" notification for the configured "peak tomorrow" sensors. If the user taps the action, the blueprint sets the corresponding `input_boolean` (`skip_am_entity` / `skip_pm_entity`) to skip the next AM or PM event.
+
+After Recovery completes, the blueprint clears the skip toggle for that period automatically.
 
 ---
 

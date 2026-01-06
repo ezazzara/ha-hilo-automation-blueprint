@@ -202,7 +202,7 @@ blueprint:
       name: Notifications 📣
       description: Notify when Hilo events occur
       input:
-        notify_device:
+        notify_targets:
           name: Notification Device
           description: Device(s) to send actionable notification to
           default: []
@@ -226,7 +226,6 @@ blueprint:
           selector:
             entity:
               domain: binary_sensor
-        
 
 # ===========================
 # TRIGGERS
@@ -312,12 +311,12 @@ variables:
     {% endif %}
 
   # Effective Recovery Temp
-    # Recovery should only run after a challenge has completed and there's no active preheat.
-    # We assume a challenge has run if:
-    #   1. The peak sensor (`peak_entity`) is OFF, and
-    #   2. The preheat sensor (`preheat_entity`) is OFF, and
-    #   3. The skip toggle for the relevant AM/PM period is not active.
-    # TODO: Improvement: set variable when challenge starts and check that instead of relying on peak_entity/preheat_entity states
+  # Recovery should only run after a challenge has completed and there's no active preheat.
+  # We assume a challenge has run if:
+  #   1. The peak sensor (`peak_entity`) is OFF, and
+  #   2. The preheat sensor (`preheat_entity`) is OFF, and
+  #   3. The skip toggle for the relevant AM/PM period is not active.
+  # TODO: Improvement: set variable when challenge starts and check that instead of relying on peak_entity/preheat_entity states
   effective_recovery_temp: >
     {% if trigger.entity_id == peak_entity and trigger.to_state.state == 'off' and not is_state(preheat_entity, 'on') and ((is_am and not skip_am) or (is_pm and not skip_pm)) %}
       {% if is_am %}
@@ -341,7 +340,7 @@ action:
               {{ trigger.id in ['peak_am', 'peak_pm'] }}
         sequence:
           - service: notify.notify
-            target: !input notify_device
+            target: !input notify_targets
             data:
               title: "Hilo Event Tomorrow"
               message: >
@@ -391,19 +390,10 @@ action:
                   - service: switch.turn_on
                     target:
                       entity_id: !input water_heater
-
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: >
-                      {% set device_defined = notify_device is defined and notify_device | length > 0 %}
-                      {{ device_defined }}
-                sequence:
-                  - service: notify.notify
-                    data:
-                      target: !input notify_device
-                      message: "Hilo Preheat has started."
-
+          - service: notify.notify
+            target: !input notify_targets
+            data:
+              message: "Hilo Preheat has started."
   # 2️⃣ Challenge
   - choose:
       - conditions:
@@ -421,19 +411,10 @@ action:
                   - service: switch.turn_off
                     target:
                       entity_id: !input water_heater
-
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: >
-                      {% set device_defined = notify_device is defined and notify_device | length > 0 %}
-                      {{ device_defined }}
-                sequence:
-                  - service: notify.notify
-                    data:
-                      target: !input notify_device
-                      message: "Hilo Challenge has started."
-
+          - service: notify.notify
+            target: !input notify_targets
+            data:
+              message: "Hilo Challenge has started."
   # 3️⃣ Recovery / Restore
   - choose:
       - conditions:
@@ -451,18 +432,10 @@ action:
                   - service: switch.turn_on
                     target:
                       entity_id: !input water_heater
-
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: >
-                      {% set device_defined = notify_device is defined and notify_device | length > 0 %}
-                      {{ device_defined and effective_recovery_temp is not none }}
-                sequence:
-                  - service: notify.notify
-                    data:
-                      target: !input notify_device
-                      message: "Hilo Recovery has started."
+          - service: notify.notify
+            target: !input notify_targets
+            data:
+              message: "Hilo Recovery has started."
 
           - delay: !input comfort_recovery_duration
           - service: scene.turn_on
