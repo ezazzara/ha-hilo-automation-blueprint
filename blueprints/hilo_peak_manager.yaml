@@ -240,11 +240,9 @@ triggers:
       - !input peak_entity
   - platform: state
     entity_id: !input peak_tomorrow_am_entity
-    from: "off"
     to: "on"
   - platform: state
     entity_id: !input peak_tomorrow_pm_entity
-    from: "off"
     to: "on"
 
 # ===========================
@@ -406,6 +404,11 @@ action:
               {{ trigger.entity_id == peak_tomorrow_am_entity
                 or trigger.entity_id == peak_tomorrow_pm_entity }}
         sequence:
+          - service: system_log.write
+            data:
+              message: "DEBUG: peak_tomorrow trigger fired: {{ trigger.entity_id }} -> {{ trigger.to_state.state }}"
+              level: info
+
           - service: notify.mobile_app
             target: !input notify_device
             data:
@@ -429,6 +432,11 @@ action:
                   action: "SKIP_EVENT"
             timeout: "12:00:00"
             continue_on_timeout: false
+
+          - service: system_log.write
+            data:
+              message: "DEBUG: SKIP_EVENT received for {{ trigger.entity_id }}; setting skip entity accordingly"
+              level: info
 
           # Apply skip toggle only if user tapped Skip
           - service: homeassistant.turn_on
