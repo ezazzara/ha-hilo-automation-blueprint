@@ -32,7 +32,7 @@ Manage AM/PM preheat, challenge (reduction), and comfort recovery phases for one
 
 - Standard AM event: `preheat` ON → thermostat set to AM preheat temp; `peak` ON → thermostat set to AM challenge temp; `peak` OFF → thermostat set to normal + AM offset for recovery, then scene restored.
 
-- Skip PM: set `skip_pm: true` to skip preheat, challenge, and recovery for the next PM event.
+- Skip PM: toggle the configured `input_boolean` to skip preheat, challenge, and recovery for the next PM event.
 
 - Water-heater control: provide a `water_heater` switch to be turned off during challenge and turned on during recovery.
 
@@ -41,7 +41,8 @@ Manage AM/PM preheat, challenge (reduction), and comfort recovery phases for one
 ## Inputs (short) 🧩
 
 - `preheat_entity`, `peak_entity` (binary_sensor)
-- `skip_am`, `skip_pm`, `do_pre_heat` (booleans)
+- `skip_am_entity`, `skip_pm_entity` (optional `input_boolean` entities) — runtime toggles
+- `do_pre_heat` (boolean)
 - `thermostats` (climate, required)
 - `water_heater` (optional switch)
 - Temperatures: `normal_temp`, `preheat_temp_am`, `preheat_temp_pm`, `challenge_temp_am`, `challenge_temp_pm`
@@ -52,15 +53,16 @@ Manage AM/PM preheat, challenge (reduction), and comfort recovery phases for one
 
 ## Install 📥
 
-1. Copy `blueprints/hilo_peak_manager.yaml` into `config/blueprints/automation/`.
-2. In Home Assistant: Configuration → Automations → Blueprints → Import, or create an automation from the UI using the blueprint.
+1. Preferred (recommended): Import the blueprint from this repository via Home Assistant **Configuration → Automations → Blueprints → Import Blueprint** and paste the raw GitHub URL for this blueprint. This links the blueprint in the UI and is the recommended method.
+
+2. Manual: download `blueprints/hilo_peak_manager.yaml` and copy it to `config/blueprints/automation/`, then reload automations in Home Assistant.
 
 ---
 
 ## Notes ⚠️
 
 - AM/PM is determined by `now().hour` (0–11 = AM, 12–23 = PM).
-- Skip toggles are boolean inputs in the blueprint—use `input_boolean` entities if you need persistent, user-editable toggles.
+- Skip toggles are optional `input_boolean` entities. The blueprint will set or clear the configured `input_boolean` when the user taps the actionable "Skip this event" notification — provide an `input_boolean` if you want in-app, runtime skip control.
 - Recovery runs when `peak` goes OFF; a more robust approach would set and check an explicit "challenge started" flag.
 
 ---

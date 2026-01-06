@@ -41,19 +41,21 @@ blueprint:
       name: Participation & Skip Toggles 🌙☀️
       description: Control which Hilo events to participate in
       input:
-        skip_am:
-          name: Skip Next AM Challenge ☀️
-          description: Skip all preheat, challenge, and recovery for the next AM event
-          default: false
+        skip_am_entity:
+          name: Skip Next AM Challenge (input_boolean)
+          description: Optional `input_boolean` entity to skip the next AM event at runtime
+          default: ""
           selector:
-            boolean:
+            entity:
+              domain: input_boolean
 
-        skip_pm:
-          name: Skip Next PM Challenge 🌙
-          description: Skip all preheat, challenge, and recovery for the next PM event
-          default: false
+        skip_pm_entity:
+          name: Skip Next PM Challenge (input_boolean)
+          description: Optional `input_boolean` entity to skip the next PM event at runtime
+          default: ""
           selector:
-            boolean:
+            entity:
+              domain: input_boolean
 
         do_pre_heat:
           name: Enable Preheat 🔥
@@ -254,10 +256,14 @@ variables:
   peak_entity: !input peak_entity
   restore_scene: !input restore_scene
 
-  # Toggles
-  skip_am: !input skip_am
-  skip_pm: !input skip_pm
+  # Toggles (input_boolean entities)
+  skip_am_entity: !input skip_am_entity
+  skip_pm_entity: !input skip_pm_entity
   do_pre_heat: !input do_pre_heat
+
+  # Effective toggle states (runtime)
+  skip_am: "{{ skip_am_entity != '' and is_state(skip_am_entity, 'on') }}"
+  skip_pm: "{{ skip_pm_entity != '' and is_state(skip_pm_entity, 'on') }}"
 
   # Temperatures & offsets
   normal_temp: !input normal_temp
@@ -381,10 +387,20 @@ action:
           - service: scene.turn_on
             target:
               entity_id: !input restore_scene
-          - service: homeassistant.turn_off
-            data:
-              entity_id:
-                - "{{ skip_am if is_am else skip_pm }}"
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ (is_am and skip_am_entity != '') or (is_pm and skip_pm_entity != '') }}
+                sequence:
+                  - service: homeassistant.turn_off
+                    data:
+                      entity_id: >
+                        {% if is_am %}
+                          {{ skip_am_entity }}
+                        {% else %}
+                          {{ skip_pm_entity }}
+                        {% endif %}
 
   # 📣(Optional) Notify for Tomorrow's Hilo Event
   - choose:
@@ -419,14 +435,24 @@ action:
             continue_on_timeout: false
 
           # Apply skip toggle only if user tapped Skip
-          - service: homeassistant.turn_on
-            data:
-              entity_id: >
-                {% if trigger.entity_id == peak_tomorrow_am_entity %}
-                  {{ skip_am }}
-                {% else %}
-                  {{ skip_pm }}
-                {% endif %}
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {% if trigger.entity_id == peak_tomorrow_am_entity %}
+                        {{ skip_am_entity != '' }}
+                      {% else %}
+                        {{ skip_pm_entity != '' }}
+                      {% endif %}
+                sequence:
+                  - service: homeassistant.turn_on
+                    data:
+                      entity_id: >
+                        {% if trigger.entity_id == peak_tomorrow_am_entity %}
+                          {{ skip_am_entity }}
+                        {% else %}
+                          {{ skip_pm_entity }}
+                        {% endif %}
 
   # 📣(Optional) Notify of Hilo Event progress
   - choose:
