@@ -336,8 +336,8 @@ action:
       - conditions:
           - condition: template
             value_template: >
-              {{ trigger.entity_id == peak_tomorrow_am_entity
-                or trigger.entity_id == peak_tomorrow_pm_entity }}
+              {% set tid = trigger.entity_id | string %}
+              {{ tid in [peak_tomorrow_am_entity | string, peak_tomorrow_pm_entity | string] }}
         sequence:
           - service: notify.mobile_app
             target: !input notify_device
