@@ -202,14 +202,12 @@ blueprint:
       name: Notifications 📣
       description: Notify when Hilo events occur
       input:
-        notify_targets:
-          name: Notification Device
-          description: Device(s) to send actionable notification to
-          default: []
+        notify_group:
+          name: Notify Group
+          description: "A user-defined notify group containing mobile_app_* devices"
           selector:
-            target:
-              device:
-                integration: mobile_app
+            entity:
+              domain: notify
 
         peak_tomorrow_am_entity:
           name: Peak Tomorrow AM Sensor
@@ -339,8 +337,8 @@ action:
             value_template: >
               {{ trigger.id in ['peak_am', 'peak_pm'] }}
         sequence:
-          - service: notify.notify
-            target: !input notify_targets
+          - service: notify.turn_on
+            target: !input notify_group
             data:
               title: "Hilo Event Tomorrow"
               message: >
@@ -390,10 +388,11 @@ action:
                   - service: switch.turn_on
                     target:
                       entity_id: !input water_heater
-          - service: notify.notify
-            target: !input notify_targets
+          - service: notify.turn_on
+            target: !input notify_group
             data:
               message: "Hilo Preheat has started."
+
   # 2️⃣ Challenge
   - choose:
       - conditions:
@@ -411,10 +410,11 @@ action:
                   - service: switch.turn_off
                     target:
                       entity_id: !input water_heater
-          - service: notify.notify
-            target: !input notify_targets
+          - service: notify.turn_on
+            target: !input notify_group
             data:
               message: "Hilo Challenge has started."
+
   # 3️⃣ Recovery / Restore
   - choose:
       - conditions:
@@ -432,8 +432,8 @@ action:
                   - service: switch.turn_on
                     target:
                       entity_id: !input water_heater
-          - service: notify.notify
-            target: !input notify_targets
+          - service: notify.turn_on
+            target: !input notify_group
             data:
               message: "Hilo Recovery has started."
 
