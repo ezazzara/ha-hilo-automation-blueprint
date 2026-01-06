@@ -284,7 +284,7 @@ variables:
   # Effective temperatures
   # -----------------------------
   effective_preheat_temp: >
-    {% if do_pre_heat and is_state(preheat_entity, 'on') %}
+    {% if trigger.entity_id == preheat_entity and trigger.to_state.state == 'on' and do_pre_heat %}
       {% if is_am and not skip_am %}
         {{ preheat_temp_am | float }}
       {% elif is_pm and not skip_pm %}
@@ -297,7 +297,7 @@ variables:
     {% endif %}
 
   effective_challenge_temp: >
-    {% if is_state(peak_entity, 'on') %}
+    {% if trigger.entity_id == peak_entity and trigger.to_state.state == 'on' %}
       {% if is_am and not skip_am %}
         {{ challenge_temp_am | float }}
       {% elif is_pm and not skip_pm %}
@@ -310,13 +310,14 @@ variables:
     {% endif %}
 
   # Effective Recovery Temp
-    # Recovery should only run after a challenge has completed.
+    # Recovery should only run after a challenge has completed and there's no active preheat.
     # We assume a challenge has run if:
-    #   1. The peak sensor (`peak_entity`) WAS on, and
-    #   2. The skip toggle for the relevant AM/PM period is not active.
-    # TODO: Improvement: set variable when challenge starts and check that instead of relying on peak_entity state
+    #   1. The peak sensor (`peak_entity`) is OFF, and
+    #   2. The preheat sensor (`preheat_entity`) is OFF, and
+    #   3. The skip toggle for the relevant AM/PM period is not active.
+    # TODO: Improvement: set variable when challenge starts and check that instead of relying on peak_entity/preheat_entity states
   effective_recovery_temp: >
-    {% if not is_state(peak_entity, 'on') and ((is_am and not skip_am) or (is_pm and not skip_pm)) %}
+    {% if trigger.entity_id == peak_entity and trigger.to_state.state == 'off' and not is_state(preheat_entity, 'on') and ((is_am and not skip_am) or (is_pm and not skip_pm)) %}
       {% if is_am %}
         {{ (normal_temp | float) + (appreciation_offset_am | float) }}
       {% else %}
@@ -330,73 +331,7 @@ variables:
 # ACTIONS
 # ===========================
 action:
-  # 1️⃣ Preheat
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ effective_preheat_temp is not none }}"
-        sequence:
-          - service: climate.set_temperature
-            target:
-              entity_id: !input thermostats
-            data:
-              temperature: "{{ effective_preheat_temp }}"
-          - choose:
-              - conditions: "{{ water_heater | length > 0 }}"
-                sequence:
-                  - service: switch.turn_on
-                    target:
-                      entity_id: !input water_heater
-
-  # 2️⃣ Challenge
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ effective_challenge_temp is not none }}"
-        sequence:
-          - service: climate.set_temperature
-            target:
-              entity_id: !input thermostats
-            data:
-              temperature: "{{ effective_challenge_temp }}"
-          - choose:
-              - conditions: "{{ water_heater | length > 0 }}"
-                sequence:
-                  - service: switch.turn_off
-                    target:
-                      entity_id: !input water_heater
-
-  # 3️⃣ Recovery / Restore
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ effective_recovery_temp is not none }}"
-        sequence:
-          - service: climate.set_temperature
-            target:
-              entity_id: !input thermostats
-            data:
-              temperature: "{{ effective_recovery_temp }}"
-          - choose:
-              - conditions: "{{ water_heater | length > 0 }}"
-                sequence:
-                  - service: switch.turn_on
-                    target:
-                      entity_id: !input water_heater
-          - delay: !input comfort_recovery_duration
-          - service: scene.turn_on
-            target:
-              entity_id: !input restore_scene
-          - service: homeassistant.turn_off
-            data:
-              entity_id: >
-                {% if is_am %}
-                  {{ skip_am_entity }}
-                {% else %}
-                  {{ skip_pm_entity }}
-                {% endif %}
-
-  # 📣(Optional) Notify for Tomorrow's Hilo Event
+  # 📣(Optional) Notify for Tomorrow's Hilo Event + apply skips
   - choose:
       - conditions:
           - condition: template
@@ -404,11 +339,6 @@ action:
               {{ trigger.entity_id == peak_tomorrow_am_entity
                 or trigger.entity_id == peak_tomorrow_pm_entity }}
         sequence:
-          - service: system_log.write
-            data:
-              message: "DEBUG: peak_tomorrow trigger fired: {{ trigger.entity_id }} -> {{ trigger.to_state.state }}"
-              level: info
-
           - service: notify.mobile_app
             target: !input notify_device
             data:
@@ -433,11 +363,6 @@ action:
             timeout: "12:00:00"
             continue_on_timeout: false
 
-          - service: system_log.write
-            data:
-              message: "DEBUG: SKIP_EVENT received for {{ trigger.entity_id }}; setting skip entity accordingly"
-              level: info
-
           # Apply skip toggle only if user tapped Skip
           - service: homeassistant.turn_on
             data:
@@ -448,40 +373,105 @@ action:
                   {{ skip_pm_entity }}
                 {% endif %}
 
-  # 📣(Optional) Notify of Hilo Event progress
+  # 1️⃣ Preheat
   - choose:
-      # 1️⃣ Preheat Notification
       - conditions:
           - condition: template
-            value_template: >
-              {% set device_defined = notify_device is defined and notify_device | length > 0 %}
-              {{ device_defined and trigger.entity_id == preheat_entity and trigger.to_state.state == 'on' }}
+            value_template: "{{ effective_preheat_temp is not none }}"
         sequence:
-          - service: notify.mobile_app
+          - service: climate.set_temperature
+            target:
+              entity_id: !input thermostats
             data:
-              target: !input notify_device
-              message: "Hilo Preheat has started."
+              temperature: "{{ effective_preheat_temp }}"
+          - choose:
+              - conditions: "{{ water_heater | length > 0 }}"
+                sequence:
+                  - service: switch.turn_on
+                    target:
+                      entity_id: !input water_heater
 
-      # 2️⃣ Challenge Notification
-      - conditions:
-          - condition: template
-            value_template: >
-              {% set device_defined = notify_device is defined and notify_device | length > 0 %}
-              {{ device_defined and trigger.entity_id == peak_entity and trigger.to_state.state == 'on' }}
-        sequence:
-          - service: notify.mobile_app
-            data:
-              target: !input notify_device
-              message: "Hilo Challenge has started."
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set device_defined = notify_device is defined and notify_device | length > 0 %}
+                      {{ device_defined }}
+                sequence:
+                  - service: notify.mobile_app
+                    data:
+                      target: !input notify_device
+                      message: "Hilo Preheat has started."
 
-      # 3️⃣ Recovery Notification
+  # 2️⃣ Challenge
+  - choose:
       - conditions:
           - condition: template
-            value_template: >
-              {% set device_defined = notify_device is defined and notify_device | length > 0 %}
-              {{ device_defined and effective_recovery_temp is not none }}
+            value_template: "{{ effective_challenge_temp is not none }}"
         sequence:
-          - service: notify.mobile_app
+          - service: climate.set_temperature
+            target:
+              entity_id: !input thermostats
             data:
-              target: !input notify_device
-              message: "Hilo Recovery has started."
+              temperature: "{{ effective_challenge_temp }}"
+          - choose:
+              - conditions: "{{ water_heater | length > 0 }}"
+                sequence:
+                  - service: switch.turn_off
+                    target:
+                      entity_id: !input water_heater
+
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set device_defined = notify_device is defined and notify_device | length > 0 %}
+                      {{ device_defined }}
+                sequence:
+                  - service: notify.mobile_app
+                    data:
+                      target: !input notify_device
+                      message: "Hilo Challenge has started."
+
+  # 3️⃣ Recovery / Restore
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ effective_recovery_temp is not none }}"
+        sequence:
+          - service: climate.set_temperature
+            target:
+              entity_id: !input thermostats
+            data:
+              temperature: "{{ effective_recovery_temp }}"
+          - choose:
+              - conditions: "{{ water_heater | length > 0 }}"
+                sequence:
+                  - service: switch.turn_on
+                    target:
+                      entity_id: !input water_heater
+
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set device_defined = notify_device is defined and notify_device | length > 0 %}
+                      {{ device_defined and effective_recovery_temp is not none }}
+                sequence:
+                  - service: notify.mobile_app
+                    data:
+                      target: !input notify_device
+                      message: "Hilo Recovery has started."
+
+          - delay: !input comfort_recovery_duration
+          - service: scene.turn_on
+            target:
+              entity_id: !input restore_scene
+          - service: homeassistant.turn_off
+            data:
+              entity_id: >
+                {% if is_am %}
+                  {{ skip_am_entity }}
+                {% else %}
+                  {{ skip_pm_entity }}
+                {% endif %}
