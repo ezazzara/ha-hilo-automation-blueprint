@@ -32,7 +32,7 @@ Manage AM/PM preheat, challenge (reduction), and comfort recovery phases for one
 
 - Standard AM event: `preheat` ON → thermostat set to AM preheat temp; `peak` ON → thermostat set to AM challenge temp; `peak` OFF → thermostat set to normal + AM offset for recovery, then scene restored.
 
-- Skip PM: toggle the configured `input_boolean` to skip preheat, challenge, and recovery for the next PM event.
+- Skip PM: toggle the configured `input_boolean` (required) to skip preheat, challenge, and recovery for the next PM event.
 
 - Water-heater control: provide a `water_heater` switch to be turned off during challenge and turned on during recovery.
 
@@ -41,7 +41,7 @@ Manage AM/PM preheat, challenge (reduction), and comfort recovery phases for one
 ## Inputs (short) 🧩
 
 - `preheat_entity`, `peak_entity` (binary_sensor)
-- `skip_am_entity`, `skip_pm_entity` (optional `input_boolean` entities) — runtime toggles
+- `skip_am_entity`, `skip_pm_entity` (`input_boolean`, REQUIRED) — runtime toggles used for notification-driven skipping
 - `do_pre_heat` (boolean)
 - `thermostats` (climate, required)
 - `water_heater` (optional switch)
@@ -59,10 +59,32 @@ Manage AM/PM preheat, challenge (reduction), and comfort recovery phases for one
 
 ---
 
+## Creating skip toggles (required)
+
+This blueprint requires two `input_boolean` Toggle helpers to be present and selected as `skip_am_entity` and `skip_pm_entity.
+
+- UI: Home Assistant → Settings → Devices & Services → Helpers → Add Helper → Toggle. Create e.g. `hilo_skip_am` and `hilo_skip_pm`.
+
+- YAML example (configuration.yaml or a helpers file):
+
+```yaml
+input_boolean:
+  hilo_skip_am:
+    name: "Hilo: Skip next AM challenge"
+    icon: mdi:weather-sunset-up
+  hilo_skip_pm:
+    name: "Hilo: Skip next PM challenge"
+    icon: mdi:weather-night
+```
+
+After creating the helpers, select them in the blueprint inputs under "Participation & Skip Toggles".
+
+---
+
 ## Notes ⚠️
 
 - AM/PM is determined by `now().hour` (0–11 = AM, 12–23 = PM).
-- Skip toggles are optional `input_boolean` entities. The blueprint will set or clear the configured `input_boolean` when the user taps the actionable "Skip this event" notification — provide an `input_boolean` if you want in-app, runtime skip control.
+- Skip toggles are required `input_boolean` entities (`skip_am_entity` / `skip_pm_entity`). The blueprint will set or clear these `input_boolean` entities when the user taps the actionable "Skip this event" notification — create and select the `input_boolean` helpers before configuring the blueprint.
 - Recovery runs when `peak` goes OFF; a more robust approach would set and check an explicit "challenge started" flag.
 
 ---
