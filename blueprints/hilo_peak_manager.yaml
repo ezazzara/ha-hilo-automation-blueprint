@@ -204,12 +204,10 @@ blueprint:
       input:
         notify_group:
           name: Notify Group
-          description: >
-            Notify service to use (example: notify.hilo_notifications or notify.mobile_app_iphone).
-            Leave empty to disable notifications.
-          default: ""
+          description: "A user-defined notify group containing mobile_app_* devices"
           selector:
-            text:
+            entity:
+              domain: notify
 
         peak_tomorrow_am_entity:
           name: Peak Tomorrow AM Sensor
@@ -339,7 +337,7 @@ action:
             value_template: >
               {{ trigger.id in ['peak_am', 'peak_pm'] }}
         sequence:
-          - service: "{{ notify_group }}"
+          - service: !input notify_group
             data:
               title: "Hilo Event Tomorrow"
               message: >
@@ -389,7 +387,7 @@ action:
                   - service: switch.turn_on
                     target:
                       entity_id: !input water_heater
-          - service: "{{ notify_group }}"
+          - service: !input notify_group
             data:
               message: "Hilo Preheat has started."
 
@@ -410,7 +408,7 @@ action:
                   - service: switch.turn_off
                     target:
                       entity_id: !input water_heater
-          - service: "{{ notify_group }}"
+          - service: !input notify_group
             data:
               message: "Hilo Challenge has started."
 
@@ -431,7 +429,7 @@ action:
                   - service: switch.turn_on
                     target:
                       entity_id: !input water_heater
-          - service: "{{ notify_group }}"
+          - service: !input notify_group
             data:
               message: "Hilo Recovery has started."
 
