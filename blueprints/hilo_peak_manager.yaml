@@ -195,36 +195,6 @@ blueprint:
             entity:
               domain: scene
 
-    # ===========================
-    # 6️⃣ Notifications 📣
-    # ===========================
-    skip_notifications:
-      name: Notifications 📣
-      description: Notify when Hilo events occur
-      input:
-        notify_group:
-          name: Notify Group
-          description: "A user-defined notify group containing mobile_app_* devices"
-          selector:
-            entity:
-              domain: notify
-
-        peak_tomorrow_am_entity:
-          name: Peak Tomorrow AM Sensor
-          description: Binary sensor indicating if AM Hilo challenge is scheduled tomorrow
-          default: ""
-          selector:
-            entity:
-              domain: binary_sensor
-
-        peak_tomorrow_pm_entity:
-          name: Peak Tomorrow PM Sensor
-          description: Binary sensor indicating if PM Hilo challenge is scheduled tomorrow
-          default: ""
-          selector:
-            entity:
-              domain: binary_sensor
-
 # ===========================
 # TRIGGERS
 # ===========================
@@ -235,14 +205,6 @@ triggers:
   - platform: state
     entity_id:
       - !input peak_entity
-  - platform: state
-    entity_id: !input peak_tomorrow_am_entity
-    to: "on"
-    id: peak_am
-  - platform: state
-    entity_id: !input peak_tomorrow_pm_entity
-    to: "on"
-    id: peak_pm
 
 # ===========================
 # VARIABLES
@@ -330,46 +292,6 @@ variables:
 # ACTIONS
 # ===========================
 action:
-  # 📣(Optional) Notify for Tomorrow's Hilo Event + apply skips
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: >
-              {{ trigger.id in ['peak_am', 'peak_pm'] }}
-        sequence:
-          - service: !input notify_group
-            data:
-              title: "Hilo Event Tomorrow"
-              message: >
-                {% if trigger.id == 'peak_am' %}
-                  An AM Hilo challenge is scheduled for tomorrow.
-                {% else %}
-                  A PM Hilo challenge is scheduled for tomorrow.
-                {% endif %}
-              data:
-                actions:
-                  - action: "SKIP_EVENT"
-                    title: "Skip this event"
-
-          # Wait for user interaction (or timeout → do nothing)
-          - wait_for_trigger:
-              - platform: event
-                event_type: mobile_app_notification_action
-                event_data:
-                  action: "SKIP_EVENT"
-            timeout: "12:00:00"
-            continue_on_timeout: false
-
-          # Apply skip toggle only if user tapped Skip
-          - service: homeassistant.turn_on
-            data:
-              entity_id: >
-                {% if trigger.id == 'peak_am' %}
-                  {{ skip_am_entity }}
-                {% else %}
-                  {{ skip_pm_entity }}
-                {% endif %}
-
   # 1️⃣ Preheat
   - choose:
       - conditions:
@@ -387,10 +309,6 @@ action:
                   - service: switch.turn_on
                     target:
                       entity_id: !input water_heater
-          - service: !input notify_group
-            data:
-              message: "Hilo Preheat has started."
-
   # 2️⃣ Challenge
   - choose:
       - conditions:
@@ -408,10 +326,6 @@ action:
                   - service: switch.turn_off
                     target:
                       entity_id: !input water_heater
-          - service: !input notify_group
-            data:
-              message: "Hilo Challenge has started."
-
   # 3️⃣ Recovery / Restore
   - choose:
       - conditions:
@@ -429,9 +343,6 @@ action:
                   - service: switch.turn_on
                     target:
                       entity_id: !input water_heater
-          - service: !input notify_group
-            data:
-              message: "Hilo Recovery has started."
 
           - delay: !input comfort_recovery_duration
           - service: scene.turn_on
